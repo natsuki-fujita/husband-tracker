@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="夫評価">
+<meta name="theme-color" content="#ffffff">
+<title>夫　評価記録</title>
+
+<!-- PWA manifest inline -->
+<script>
+const manifestData = {
+  name: "夫　評価記録",
+  short_name: "夫評価",
+  start_url: "./",
+  display: "standalone",
+  background_color: "#ffffff",
+  theme_color: "#ffffff",
+  orientation: "portrait",
+  icons: [
+    { src: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23fff9f0'/><text x='96' y='130' text-anchor='middle' font-size='110'>⚖️</text></svg>`), sizes: "192x192", type: "image/svg+xml" },
+    { src: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%23fff9f0'/><text x='256' y='360' text-anchor='middle' font-size='300'>⚖️</text></svg>`), sizes: "512x512", type: "image/svg+xml" }
+  ]
+};
+const blob = new Blob([JSON.stringify(manifestData)], {type:'application/json'});
+const mUrl = URL.createObjectURL(blob);
+document.write(`<link rel="manifest" href="${mUrl}">`);
+</script>
+
+<!-- Apple touch icon -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20180%20180'%3E%3Crect%20width%3D'180'%20height%3D'180'%20rx%3D'40'%20fill%3D'%23fff9f0'%2F%3E%3Ctext%20x%3D'90'%20y%3D'125'%20text-anchor%3D'middle'%20font-size%3D'100'%3E%E2%9A%96%EF%B8%8F%3C%2Ftext%3E%3C%2Fsvg%3E">
+
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Noto Sans JP', sans-serif; background: #fff9f0; -webkit-tap-highlight-color: transparent; }
+button { font-family: 'Noto Sans JP', sans-serif; }
+textarea, input { font-family: 'Noto Sans JP', sans-serif; }
+
+/* ── Confetti canvas ── */
+#confetti-canvas {
+  position: fixed; inset: 0; pointer-events: none; z-index: 900; display: none;
+}
+
+/* ── Toast ── */
+.toast {
+  position: fixed; top: 80px; left: 50%; transform: translateX(-50%) translateY(-30px);
+  z-index: 800; background: white; border-radius: 18px;
+  padding: 14px 20px 14px 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.18);
+  display: flex; align-items: center; gap: 12px;
+  opacity: 0; transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  min-width: 240px; max-width: 320px; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast-bar {
+  position: absolute; bottom: 0; left: 0; height: 3px;
+  border-radius: 0 0 18px 18px; width: 100%;
+}
+@keyframes shrinkBar { from { width: 100% } to { width: 0% } }
+
+/* ── Milestone overlay ── */
+.milestone-overlay {
+  position: fixed; inset: 0; z-index: 700;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55); opacity: 0;
+  transition: opacity 0.3s; pointer-events: none;
+}
+.milestone-overlay.show { opacity: 1; pointer-events: auto; }
+.milestone-card {
+  background: white; border-radius: 24px;
+  padding: 36px 28px; text-align: center;
+  max-width: 300px; width: calc(100% - 48px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  transform: scale(0.8); transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+.milestone-overlay.show .milestone-card { transform: scale(1); }
+
+/* ── Page transitions ── */
+.page { display: none; flex-direction: column; min-height: 100vh; padding-bottom: 72px; }
+.page.active { display: flex; }
+
+/* ── Nav bar ── */
+.nav-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; height: 62px;
+  background: white; border-top: 1px solid #f0f0f0;
+  display: flex; z-index: 100; box-shadow: 0 -4px 24px rgba(0,0,0,0.07);
+}
+.nav-btn {
+  flex: 1; background: none; border: none; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 3px; color: #bbb;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.05em;
+  transition: color 0.15s;
+}
+.nav-btn.active { color: #444; }
+.nav-btn span:first-child { font-size: 22px; }
+
+/* ── Modals ── */
+.modal-bg {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-box {
+  background: white; border-radius: 20px;
+  padding: 24px 20px; width: calc(100% - 48px);
+  max-width: 340px; box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+.sheet-bg {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.45);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.sheet-box {
+  border-radius: 20px 20px 0 0;
+  padding: 24px 20px 40px; width: 100%; max-width: 420px;
+}
+.hidden { display: none !important; }
+
+/* ── Dome button wrapper ── */
+.dome-wrap {
+  display: flex; justify-content: center;
+  user-select: none; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  line-height: 0;
+}
+
+/* ── Input styles ── */
+.field-input {
+  width: 100%; border: 1.5px solid #e8e8e8; background: #fafafa;
+  padding: 11px 12px; font-size: 13px; color: #333; outline: none;
+  border-radius: 12px; margin-top: 6px;
+}
+.field-label {
+  font-size: 10px; letter-spacing: 0.15em; color: #aaa;
+  display: block; font-weight: 700;
+}
+
+/* ── Cards ── */
+.white-card {
+  background: white; border-radius: 18px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+/* ── Streak card ── */
+.streak-row { display: flex; gap: 10px; margin-bottom: 16px; }
+.streak-card {
+  flex: 1; border-radius: 14px; padding: 12px; text-align: center;
+}
+
+/* ── Confetti particle ── */
+@keyframes confettiFall {
+  0%   { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="confetti-canvas"></canvas>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  MAIN PAGE                                 -->
+<!-- ══════════════════════════════════════════ -->
+<div id="page-main" class="page active">
+  <div style="background:white;padding:15px 20px 13px;box-shadow:0 2px 16px rgba(0,0,0,0.07);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+    <span id="header-title" style="font-size:13px;letter-spacing:0.12em;font-weight:700;color:#444;"></span>
+    <span style="font-size:11px;color:#ccc;">記録開始から <strong id="day-count" style="color:#999;font-size:13px;"></strong> 日目</span>
+  </div>
+
+  <div style="padding:16px;flex:1;overflow-y:auto;">
+    <!-- streak row -->
+    <div id="streak-row" class="streak-row hidden"></div>
+
+    <!-- score card -->
+    <div class="white-card" style="padding:16px;margin-bottom:16px;">
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin-bottom:14px;">
+        <div style="text-align:center;">
+          <div id="rage-label-card" style="font-size:11px;font-weight:700;color:#e74c3c;letter-spacing:0.1em;margin-bottom:4px;"></div>
+          <div id="rage-count" style="font-size:38px;font-weight:700;color:#e74c3c;line-height:1;">0</div>
+          <div id="rage-score" style="font-size:10px;color:#ddd;margin-top:2px;">0pt</div>
+        </div>
+        <div style="text-align:center;padding:0 4px;">
+          <div id="verdict-text" style="font-size:10px;font-weight:700;letter-spacing:0.06em;white-space:nowrap;line-height:1.5;color:#aaa;"></div>
+        </div>
+        <div style="text-align:center;">
+          <div id="thanks-label-card" style="font-size:11px;font-weight:700;color:#27ae60;letter-spacing:0.1em;margin-bottom:4px;"></div>
+          <div id="thanks-count" style="font-size:38px;font-weight:700;color:#27ae60;line-height:1;">0</div>
+          <div id="thanks-score" style="font-size:10px;color:#ddd;margin-top:2px;">0pt</div>
+        </div>
+      </div>
+      <!-- meter -->
+      <div style="height:10px;background:#f0f0f0;border-radius:5px;overflow:hidden;position:relative;margin-bottom:6px;">
+        <div id="meter-rage"  style="position:absolute;left:0;top:0;height:100%;width:50%;background:linear-gradient(90deg,#e74c3c,#ff6b6b);transition:width 0.6s cubic-bezier(0.4,0,0.2,1);border-radius:5px 0 0 5px;"></div>
+        <div id="meter-thanks" style="position:absolute;right:0;top:0;height:100%;width:50%;background:linear-gradient(270deg,#27ae60,#5dd878);transition:width 0.6s cubic-bezier(0.4,0,0.2,1);border-radius:0 5px 5px 0;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <span id="pct-rage"   style="font-size:10px;color:#e74c3c;font-weight:700;">50%</span>
+        <span id="pct-total"  style="font-size:9px;color:#ccc;">累計 0件 / 0pt</span>
+        <span id="pct-thanks" style="font-size:10px;color:#27ae60;font-weight:700;">50%</span>
+      </div>
+    </div>
+
+    <!-- dome buttons -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+      <div class="dome-wrap" id="btn-rage"></div>
+      <div class="dome-wrap" id="btn-thanks"></div>
+    </div>
+
+    <!-- memo nav -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <button onclick="goMemo('rage')" style="background:white;border:2px solid #e74c3c25;color:#444;padding:13px 12px;font-size:12px;letter-spacing:0.06em;cursor:pointer;font-weight:700;display:flex;justify-content:space-between;align-items:center;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,0.06);">
+        <span id="rage-memo-label" style="color:#e74c3c;"></span>
+        <span id="rage-memo-count" style="background:#e74c3c;color:white;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">0</span>
+      </button>
+      <button onclick="goMemo('thanks')" style="background:white;border:2px solid #27ae6025;color:#444;padding:13px 12px;font-size:12px;letter-spacing:0.06em;cursor:pointer;font-weight:700;display:flex;justify-content:space-between;align-items:center;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,0.06);">
+        <span id="thanks-memo-label" style="color:#27ae60;"></span>
+        <span id="thanks-memo-count" style="background:#27ae60;color:white;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">0</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- flash overlay -->
+  <div id="flash-overlay" style="position:fixed;inset:0;z-index:50;pointer-events:none;opacity:0;transition:opacity 0.4s;"></div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  STATS PAGE                                -->
+<!-- ══════════════════════════════════════════ -->
+<div id="page-stats" class="page">
+  <div style="background:white;padding:16px 20px;box-shadow:0 2px 12px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+    <span style="font-size:14px;font-weight:700;">📊 グラフ</span>
+    <button onclick="showReport()" style="background:linear-gradient(135deg,#f093fb,#f5576c);color:white;border:none;border-radius:20px;padding:7px 16px;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(245,87,108,0.35);">今月の総括 📋</button>
+  </div>
+  <div style="padding:16px;flex:1;overflow-y:auto;">
+    <div class="white-card" style="padding:20px;margin-bottom:16px;">
+      <div style="font-size:11px;color:#bbb;letter-spacing:0.15em;font-weight:700;margin-bottom:16px;">月別スコア（過去6ヶ月）</div>
+      <div id="bar-chart"></div>
+    </div>
+    <div class="white-card" style="padding:20px;">
+      <div style="font-size:11px;color:#bbb;letter-spacing:0.15em;font-weight:700;margin-bottom:16px;">カテゴリ別累計</div>
+      <div id="category-chart"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  MEMO PAGE                                 -->
+<!-- ══════════════════════════════════════════ -->
+<div id="page-memo" class="page">
+  <div style="background:white;padding:16px 20px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 12px rgba(0,0,0,0.06);flex-shrink:0;">
+    <button onclick="goPage('main')" style="background:#f5f5f5;border:none;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">←</button>
+    <span id="memo-page-title" style="font-size:14px;letter-spacing:0.1em;font-weight:700;"></span>
+    <span id="memo-page-count" style="margin-left:auto;font-size:11px;color:#ccc;"></span>
+  </div>
+  <div style="padding:20px;flex:1;overflow-y:auto;">
+    <div style="display:flex;gap:8px;margin-bottom:20px;">
+      <textarea id="memo-input" style="flex:1;border:1.5px solid #e0e0e0;background:white;padding:11px 12px;font-size:13px;resize:none;height:60px;color:#333;outline:none;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.05);" placeholder="ひとことメモ…"></textarea>
+      <button id="memo-submit-btn" onclick="submitMemo()" style="color:white;border:none;padding:0 18px;font-size:13px;letter-spacing:0.05em;cursor:pointer;font-weight:700;border-radius:14px;white-space:nowrap;">記録</button>
+    </div>
+    <div id="memo-list"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  NAV BAR                                   -->
+<!-- ══════════════════════════════════════════ -->
+<nav class="nav-bar">
+  <button class="nav-btn active" id="nav-main" onclick="goPage('main')"><span>🏠</span>ホーム</button>
+  <button class="nav-btn" id="nav-stats" onclick="goPage('stats')"><span>📊</span>グラフ</button>
+  <button class="nav-btn" id="nav-settings" onclick="openSettings()"><span>⚙️</span>設定</button>
+</nav>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  INTENSITY SHEET                           -->
+<!-- ══════════════════════════════════════════ -->
+<div id="intensity-sheet" class="sheet-bg hidden" onclick="closeIntensity()">
+  <div id="intensity-box" class="sheet-box" onclick="event.stopPropagation()">
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 18px;"></div>
+    <div id="intensity-title" style="text-align:center;margin-bottom:14px;font-size:14px;font-weight:700;letter-spacing:0.1em;"></div>
+    <div id="intensity-levels" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;"></div>
+    <div style="font-size:10px;color:#aaa;letter-spacing:0.15em;margin-bottom:8px;font-weight:700;">カテゴリ（任意）</div>
+    <div id="intensity-tags" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px;"></div>
+    <button id="intensity-confirm" onclick="confirmIntensity()" style="width:100%;color:white;border:none;border-radius:14px;padding:15px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:0.1em;transition:all 0.2s;">記録する</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  SETTINGS MODAL                            -->
+<!-- ══════════════════════════════════════════ -->
+<div id="settings-modal" class="modal-bg hidden" onclick="closeSettings()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div style="font-size:13px;letter-spacing:0.15em;font-weight:700;margin-bottom:20px;">⚙️ 設定</div>
+    <div style="margin-bottom:14px;">
+      <label class="field-label" id="set-rage-lbl"></label>
+      <input class="field-input" id="set-rage-input" maxlength="10">
+    </div>
+    <div style="margin-bottom:14px;">
+      <label class="field-label" id="set-thanks-lbl"></label>
+      <input class="field-input" id="set-thanks-input" maxlength="10">
+    </div>
+    <div style="margin-bottom:20px;">
+      <label class="field-label">タイトル</label>
+      <input class="field-input" id="set-title-input" maxlength="20">
+    </div>
+    <button onclick="saveSettings()" style="width:100%;background:linear-gradient(135deg,#43e97b,#38f9d7);color:white;border:none;padding:13px;font-size:13px;letter-spacing:0.1em;cursor:pointer;font-weight:700;border-radius:14px;margin-bottom:10px;box-shadow:0 6px 20px rgba(67,233,123,0.35);">保存</button>
+    <button onclick="showReset()" style="width:100%;background:transparent;color:#e74c3c;border:1.5px solid rgba(231,76,60,0.4);padding:11px;font-size:11px;letter-spacing:0.1em;cursor:pointer;font-weight:700;border-radius:14px;">データをリセット</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  RESET CONFIRM MODAL                       -->
+<!-- ══════════════════════════════════════════ -->
+<div id="reset-modal" class="modal-bg hidden" onclick="closeReset()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div style="font-size:13px;letter-spacing:0.15em;font-weight:700;margin-bottom:16px;">本当に消してもいいですか？</div>
+    <p style="font-size:12px;color:#888;line-height:1.9;margin-bottom:20px;">すべてのカウント・メモ・連続記録が削除されます。<br>この操作は元に戻せません。</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <button onclick="closeReset()" style="background:#f5f5f5;color:#888;border:none;padding:13px;font-size:12px;cursor:pointer;font-weight:700;border-radius:14px;">キャンセル</button>
+      <button onclick="doReset()" style="background:#e74c3c;color:white;border:none;padding:13px;font-size:12px;cursor:pointer;font-weight:700;border-radius:14px;box-shadow:0 4px 12px rgba(231,76,60,0.4);">削除する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  MONTHLY REPORT MODAL                      -->
+<!-- ══════════════════════════════════════════ -->
+<div id="report-modal" class="modal-bg hidden" onclick="closeReport()">
+  <div style="background:white;border-radius:20px;padding:24px 20px;width:calc(100% - 48px);max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <span id="report-title" style="font-weight:700;font-size:15px;"></span>
+      <button onclick="closeReport()" style="background:#f0f0f0;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;color:#888;display:flex;align-items:center;justify-content:center;">×</button>
+    </div>
+    <div id="report-body"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  TOAST                                     -->
+<!-- ══════════════════════════════════════════ -->
+<div id="toast" class="toast">
+  <div id="toast-emoji" style="font-size:36px;line-height:1;flex-shrink:0;"></div>
+  <div>
+    <div id="toast-msg" style="font-size:12px;font-weight:700;color:#333;line-height:1.5;"></div>
+    <div id="toast-sub" style="font-size:10px;color:#bbb;margin-top:2px;"></div>
+  </div>
+  <div id="toast-bar" class="toast-bar"></div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  MILESTONE OVERLAY                         -->
+<!-- ══════════════════════════════════════════ -->
+<div id="milestone-overlay" class="milestone-overlay" onclick="closeMilestone()">
+  <div class="milestone-card" onclick="event.stopPropagation()">
+    <div id="milestone-emoji" style="font-size:64px;margin-bottom:12px;"></div>
+    <div id="milestone-title" style="font-size:18px;font-weight:700;color:#333;margin-bottom:8px;"></div>
+    <div id="milestone-desc" style="font-size:13px;color:#888;line-height:1.7;margin-bottom:24px;"></div>
+    <button onclick="closeMilestone()" style="background:linear-gradient(135deg,#f093fb,#f5576c);color:white;border:none;border-radius:14px;padding:12px 32px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(245,87,108,0.4);">やった！</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════════════
+const SK = "husband_tracker_v7";
+const DEFAULT_STATE = {
+  rage:0, thanks:0,
+  rageMemos:[], thanksMemos:[],
+  rageEvents:[], thanksEvents:[],
+  startDate: new Date().toISOString(),
+  rageLabel:"激怒", thanksLabel:"感謝",
+  title:"夫　評価記録",
+  lastStreakNotif: null,
+  shownMilestones: [],
+};
+
+function loadState(){
+  try{ const r=localStorage.getItem(SK); return r?{...DEFAULT_STATE,...JSON.parse(r)}:DEFAULT_STATE; }
+  catch{ return DEFAULT_STATE; }
+}
+function saveState(s){ try{ localStorage.setItem(SK,JSON.stringify(s)); }catch{} }
+
+let ST = loadState();
+let currentMemoType = "rage";
+let intensityType = null;
+let intensityScore = null;
+let intensityTag = null;
+
+const TAGS_RAGE   = ["家事","言葉","態度","お金","子育て","その他"];
+const TAGS_THANKS = ["家事","言葉","気遣い","お金","子育て","その他"];
+
+// ── Milestones ──
+const MILESTONES = [
+  { id:"total_10",   check:s=>s.rage+s.thanks>=10,      emoji:"🎉",title:"10件記録達成！",      desc:"記録を続けていますね。\nこれからも淡々と積み上げましょう。" },
+  { id:"total_50",   check:s=>s.rage+s.thanks>=50,      emoji:"🏆",title:"50件突破！",           desc:"もうベテラン記録者です。\nデータが貯まってきましたね。" },
+  { id:"total_100",  check:s=>s.rage+s.thanks>=100,     emoji:"💯",title:"100件達成！",          desc:"100件！素晴らしい継続力です。\n感情の記録が宝の山になっています。" },
+  { id:"day_7",      check:s=>dayCount(s.startDate)>=7, emoji:"📅",title:"記録開始1週間！",      desc:"7日間続けました。\n習慣になってきた証拠です。" },
+  { id:"day_30",     check:s=>dayCount(s.startDate)>=30,emoji:"🌙",title:"記録開始1ヶ月！",      desc:"1ヶ月継続おめでとうございます。\n月別グラフが充実してきましたよ。" },
+  { id:"day_100",    check:s=>dayCount(s.startDate)>=100,emoji:"💎",title:"記録開始100日！",     desc:"100日！もはや生活の一部ですね。\n累計データが財産になっています。" },
+  { id:"thanks_over",check:s=>s.thanks>s.rage&&s.thanks>=5,emoji:"🌸",title:"感謝が激怒を超えた！",desc:"感謝ポイントが優勢になりました。\n良い兆候かもしれません。" },
+  { id:"rage_streak_3", check:(_,rs,__)=>rs>=3,         emoji:"🔥",title:`激怒3日連続！`,       desc:"3日間ずっと激怒…\n何か一度話し合うサインかも。" },
+  { id:"thanks_streak_3", check:(_,__,ts)=>ts>=3,       emoji:"🌈",title:`感謝3日連続！`,       desc:"3日間連続で感謝！\n素晴らしい関係性の証拠です。" },
+];
+
+// ═══════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════
+const fmtDate=()=>{ const n=new Date(); return `${n.getMonth()+1}/${n.getDate()} ${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`; };
+const dayCount=(iso)=>Math.floor((new Date()-new Date(iso))/86400000)+1;
+const ym=(d)=>{ const dd=new Date(d); return `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}`; };
+const ymLabel=(k)=>k.split("-")[1]+"月";
+
+function calcStreak(events){
+  const days=new Set(events.map(e=>new Date(e.date).toDateString()));
+  let streak=0;
+  for(let i=0;i<365;i++){
+    const d=new Date(); d.setDate(d.getDate()-i);
+    if(days.has(d.toDateString())) streak++;
+    else break;
+  }
+  return streak;
+}
+
+// ═══════════════════════════════════════════════════════
+//  SVG DOME BUTTON BUILDER
+// ═══════════════════════════════════════════════════════
+function buildDomeSVG(variant, label, pressed){
+  const id=variant, isRed=variant==="red";
+  const btnSide=isRed?["#c40000","#df0000","#b80000","#de0000","#a60000"]:["#1a5c33","#23803f","#165228","#237a3d","#113d22"];
+  const btnTop=isRed?{i:"#e82020",m:"#cc0000",o:"#a60000"}:{i:"#2da050",m:"#1e8040",o:"#145e2c"};
+  const sideH=pressed?70:120, sideTopY=pressed?210:160, topCY=pressed?210:160;
+  const stops=btnSide.map((c,i)=>`<stop offset="${i*25}%" stop-color="${c}"/>`).join("");
+  return `<svg width="155" height="125" viewBox="100 150 600 270" xmlns="http://www.w3.org/2000/svg"
+    style="display:block;transition:filter 0.07s;filter:${pressed?"brightness(0.85)":"brightness(1)"}">
+    <defs>
+      <filter id="sb-${id}" x="-20%" y="-20%" width="140%" height="160%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="10" result="blur"/>
+        <feOffset dx="0" dy="${pressed?4:10}" result="ob"/>
+        <feColorMatrix in="ob" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.28 0"/>
+        <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="sb2-${id}" x="-20%" y="-20%" width="140%" height="160%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur"/>
+        <feOffset dx="0" dy="${pressed?2:8}" result="ob"/>
+        <feColorMatrix in="ob" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2 0"/>
+        <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <linearGradient id="bsid-${id}" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#a9a9a9"/><stop offset="20%" stop-color="#c8c8c8"/>
+        <stop offset="50%" stop-color="#9d9d9d"/><stop offset="80%" stop-color="#c4c4c4"/>
+        <stop offset="100%" stop-color="#8f8f8f"/>
+      </linearGradient>
+      <linearGradient id="btop-${id}" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#d8d8d8"/><stop offset="100%" stop-color="#bdbdbd"/>
+      </linearGradient>
+      <linearGradient id="btsid-${id}" x1="0%" y1="0%" x2="100%" y2="0%">${stops}</linearGradient>
+      <radialGradient id="bttop-${id}" cx="50%" cy="38%" r="70%">
+        <stop offset="0%" stop-color="${btnTop.i}"/><stop offset="70%" stop-color="${btnTop.m}"/><stop offset="100%" stop-color="${btnTop.o}"/>
+      </radialGradient>
+    </defs>
+    <g filter="url(#sb-${id})">
+      <ellipse cx="400" cy="380" rx="300" ry="115" fill="url(#bsid-${id})"/>
+      <rect x="100" y="280" width="600" height="100" fill="url(#bsid-${id})"/>
+      <ellipse cx="400" cy="280" rx="300" ry="115" fill="url(#btop-${id})"/>
+    </g>
+    <g filter="url(#sb2-${id})">
+      <ellipse cx="400" cy="280" rx="235" ry="92" fill="url(#btsid-${id})"/>
+      <rect x="165" y="${sideTopY}" width="470" height="${sideH}" fill="url(#btsid-${id})"/>
+      <ellipse cx="400" cy="${topCY}" rx="235" ry="92" fill="url(#bttop-${id})"/>
+    </g>
+    <text x="400" y="${topCY+8}" text-anchor="middle" dominant-baseline="middle"
+      fill="rgba(255,255,255,0.92)" font-size="58" font-family="'Noto Sans JP',sans-serif"
+      font-weight="700" letter-spacing="5" style="pointer-events:none;user-select:none">${label}</text>
+  </svg>`;
+}
+
+function setupDomeButton(wrapId, variant, type){
+  const wrap = document.getElementById(wrapId);
+  const label = type==="rage" ? ST.rageLabel : ST.thanksLabel;
+  wrap.innerHTML = buildDomeSVG(variant, label, false);
+  let pressed = false;
+
+  const down = () => {
+    if(pressed) return;
+    pressed = true;
+    wrap.innerHTML = buildDomeSVG(variant, label, true);
+  };
+  const up = () => {
+    if(!pressed) return;
+    pressed = false;
+    wrap.innerHTML = buildDomeSVG(variant, label, false);
+    openIntensity(type);
+  };
+  const cancel = () => {
+    if(!pressed) return;
+    pressed = false;
+    wrap.innerHTML = buildDomeSVG(variant, label, false);
+  };
+
+  wrap.addEventListener("mousedown", down);
+  wrap.addEventListener("mouseup", up);
+  wrap.addEventListener("mouseleave", cancel);
+  wrap.addEventListener("touchstart", e=>{ e.preventDefault(); down(); }, {passive:false});
+  wrap.addEventListener("touchend",   e=>{ e.preventDefault(); up(); },   {passive:false});
+}
+
+// ═══════════════════════════════════════════════════════
+//  UI RENDER
+// ═══════════════════════════════════════════════════════
+function render(){
+  const s = ST;
+  const rScore = s.rageEvents.reduce((a,e)=>a+(e.score||1),0) || s.rage;
+  const tScore = s.thanksEvents.reduce((a,e)=>a+(e.score||1),0) || s.thanks;
+  const total  = s.rage + s.thanks;
+  const totalScore = rScore + tScore;
+  const rPct = totalScore===0 ? 50 : Math.round(rScore/totalScore*100);
+  const tPct = 100 - rPct;
+  const dc   = dayCount(s.startDate);
+  const rStreak = calcStreak(s.rageEvents);
+  const tStreak = calcStreak(s.thanksEvents);
+
+  // header
+  document.getElementById("header-title").textContent = s.title;
+  document.getElementById("day-count").textContent = dc;
+
+  // labels
+  document.getElementById("rage-label-card").textContent  = s.rageLabel;
+  document.getElementById("thanks-label-card").textContent = s.thanksLabel;
+  document.getElementById("rage-count").textContent   = s.rage;
+  document.getElementById("thanks-count").textContent = s.thanks;
+  document.getElementById("rage-score").textContent   = rScore + "pt";
+  document.getElementById("thanks-score").textContent = tScore + "pt";
+
+  // verdict
+  let vt = "まだ記録なし", vc = "#aaa";
+  if(total>0){
+    if(rPct>tPct){ vt=`${s.rageLabel} ${rPct}% 優勢`; vc="#e74c3c"; }
+    else if(tPct>rPct){ vt=`${s.thanksLabel} ${tPct}% 優勢`; vc="#27ae60"; }
+    else { vt="五分五分"; vc="#aaa"; }
+  }
+  const vEl = document.getElementById("verdict-text");
+  vEl.textContent = vt; vEl.style.color = vc;
+
+  // meter
+  document.getElementById("meter-rage").style.width   = rPct + "%";
+  document.getElementById("meter-thanks").style.width = tPct + "%";
+  document.getElementById("pct-rage").textContent     = rPct + "%";
+  document.getElementById("pct-thanks").textContent   = tPct + "%";
+  document.getElementById("pct-total").textContent    = `累計 ${total}件 / ${totalScore}pt`;
+
+  // memo labels & counts
+  document.getElementById("rage-memo-label").textContent   = s.rageLabel   + "メモ";
+  document.getElementById("thanks-memo-label").textContent = s.thanksLabel + "メモ";
+  document.getElementById("rage-memo-count").textContent   = s.rageMemos.length;
+  document.getElementById("thanks-memo-count").textContent = s.thanksMemos.length;
+
+  // streak cards
+  const srow = document.getElementById("streak-row");
+  srow.innerHTML = "";
+  if(rStreak>=2 || tStreak>=2){
+    srow.classList.remove("hidden");
+    if(rStreak>=2) srow.innerHTML += `
+      <div class="streak-card" style="background:linear-gradient(135deg,#fff0f0,#ffe4e4);border:1.5px solid #f5c6c6;">
+        <div style="font-size:22px;margin-bottom:2px;">🔥</div>
+        <div style="font-size:20px;font-weight:700;color:#e74c3c;line-height:1;">${rStreak}</div>
+        <div style="font-size:10px;color:#e74c3c;font-weight:700;margin-top:2px;">日連続${s.rageLabel}</div>
+      </div>`;
+    if(tStreak>=2) srow.innerHTML += `
+      <div class="streak-card" style="background:linear-gradient(135deg,#f0fff4,#dcffe8);border:1.5px solid #b7dfc5;">
+        <div style="font-size:22px;margin-bottom:2px;">🌸</div>
+        <div style="font-size:20px;font-weight:700;color:#27ae60;line-height:1;">${tStreak}</div>
+        <div style="font-size:10px;color:#27ae60;font-weight:700;margin-top:2px;">日連続${s.thanksLabel}</div>
+      </div>`;
+  } else {
+    srow.classList.add("hidden");
+  }
+
+  // rebuild dome buttons (labels may have changed)
+  setupDomeButton("btn-rage",   "red",   "rage");
+  setupDomeButton("btn-thanks", "green", "thanks");
+}
+
+// ═══════════════════════════════════════════════════════
+//  PAGE NAVIGATION
+// ═══════════════════════════════════════════════════════
+function goPage(id){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));
+  document.getElementById("page-"+id).classList.add("active");
+  const nb = document.getElementById("nav-"+id);
+  if(nb) nb.classList.add("active");
+  if(id==="stats") renderStats();
+}
+
+function goMemo(type){
+  currentMemoType = type;
+  const color = type==="rage" ? "#e74c3c" : "#27ae60";
+  const label = (type==="rage" ? ST.rageLabel : ST.thanksLabel) + "メモ";
+  document.getElementById("memo-page-title").textContent = label;
+  document.getElementById("memo-page-title").style.color = color;
+  const memos = type==="rage" ? ST.rageMemos : ST.thanksMemos;
+  document.getElementById("memo-page-count").textContent = memos.length + "件";
+  document.getElementById("memo-submit-btn").style.background = color;
+  document.getElementById("memo-submit-btn").style.boxShadow = `0 4px 12px ${color}40`;
+  renderMemoList();
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));
+  document.getElementById("page-memo").classList.add("active");
+}
+
+function renderMemoList(){
+  const memos = currentMemoType==="rage" ? ST.rageMemos : ST.thanksMemos;
+  const color  = currentMemoType==="rage" ? "#e74c3c" : "#27ae60";
+  const list   = document.getElementById("memo-list");
+  document.getElementById("memo-page-count").textContent = memos.length + "件";
+  if(memos.length===0){
+    list.innerHTML = `<div style="text-align:center;color:#ccc;font-size:13px;margin-top:60px;">まだメモがありません</div>`;
+    return;
+  }
+  list.innerHTML = memos.map(m=>`
+    <div style="background:white;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 10px rgba(0,0,0,0.06);display:flex;justify-content:space-between;gap:12px;">
+      <div style="flex:1;">
+        <div style="font-size:13px;line-height:1.8;color:#333;">${escHtml(m.text)}</div>
+        <div style="font-size:10px;color:#ccc;margin-top:4px;">${m.date}</div>
+      </div>
+      <button onclick="deleteMemo('${currentMemoType}',${m.id})" style="background:#f5f5f5;border:none;border-radius:50%;width:26px;height:26px;color:#bbb;cursor:pointer;font-size:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;align-self:flex-start;">×</button>
+    </div>`).join("");
+}
+
+function submitMemo(){
+  const inp = document.getElementById("memo-input");
+  const text = inp.value.trim();
+  if(!text) return;
+  const m = { text, date: fmtDate(), id: Date.now() };
+  if(currentMemoType==="rage") ST.rageMemos.unshift(m);
+  else ST.thanksMemos.unshift(m);
+  saveState(ST);
+  inp.value = "";
+  renderMemoList();
+  render();
+}
+
+function deleteMemo(type, id){
+  if(type==="rage") ST.rageMemos = ST.rageMemos.filter(m=>m.id!==id);
+  else ST.thanksMemos = ST.thanksMemos.filter(m=>m.id!==id);
+  saveState(ST);
+  renderMemoList();
+  render();
+}
+
+document.getElementById("memo-input").addEventListener("keydown", e=>{
+  if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); submitMemo(); }
+});
+
+// ═══════════════════════════════════════════════════════
+//  INTENSITY SHEET
+// ═══════════════════════════════════════════════════════
+function openIntensity(type){
+  intensityType  = type;
+  intensityScore = null;
+  intensityTag   = null;
+  const isRage = type==="rage";
+  const color  = isRage ? "#e74c3c" : "#27ae60";
+  const bg     = isRage ? "#fff5f5" : "#f0fff4";
+  const label  = isRage ? ST.rageLabel : ST.thanksLabel;
+  const levels = isRage
+    ?[{s:1,e:"😤",l:"ちょっとイラッ"},{s:2,e:"😡",l:"かなり怒り"},{s:3,e:"🤬",l:"激怒レベル"}]
+    :[{s:1,e:"🙂",l:"ちょっと感謝"},{s:2,e:"😊",l:"かなり感謝"},{s:3,e:"🥰",l:"超感謝"}];
+  const tags = isRage ? TAGS_RAGE : TAGS_THANKS;
+
+  document.getElementById("intensity-box").style.background = bg;
+  document.getElementById("intensity-title").textContent = label + "の強さは？";
+  document.getElementById("intensity-title").style.color = color;
+
+  // levels
+  const lvlEl = document.getElementById("intensity-levels");
+  lvlEl.innerHTML = levels.map(l=>`
+    <button onclick="selectScore(${l.s},'${color}')" id="lvl-${l.s}"
+      style="background:white;color:${color};border:2px solid ${color};border-radius:14px;padding:14px 6px;cursor:pointer;transition:all 0.15s;">
+      <div style="font-size:28px;margin-bottom:6px;">${l.e}</div>
+      <div style="font-size:11px;font-weight:700;">${l.l}</div>
+    </button>`).join("");
+
+  // tags
+  const tagEl = document.getElementById("intensity-tags");
+  tagEl.innerHTML = tags.map(t=>`
+    <button onclick="selectTag('${t}','${color}')" id="tag-${t}"
+      style="background:white;color:${color};border:1.5px solid ${color};border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;">
+      ${t}
+    </button>`).join("");
+
+  const confirmBtn = document.getElementById("intensity-confirm");
+  confirmBtn.style.background = "#e0e0e0";
+  confirmBtn.style.boxShadow  = "none";
+  confirmBtn.disabled = true;
+
+  document.getElementById("intensity-sheet").classList.remove("hidden");
+}
+
+function selectScore(s, color){
+  intensityScore = s;
+  document.querySelectorAll("[id^='lvl-']").forEach(b=>{
+    b.style.background = "white";
+    b.style.color = color;
+    b.style.boxShadow = "none";
+  });
+  const el = document.getElementById(`lvl-${s}`);
+  el.style.background = color;
+  el.style.color = "white";
+  el.style.boxShadow = `0 4px 12px ${color}40`;
+
+  const confirmBtn = document.getElementById("intensity-confirm");
+  confirmBtn.style.background = color;
+  confirmBtn.style.boxShadow  = `0 6px 20px ${color}50`;
+  confirmBtn.disabled = false;
+}
+
+function selectTag(t, color){
+  if(intensityTag===t){ intensityTag=null; }
+  else { intensityTag=t; }
+  document.querySelectorAll("[id^='tag-']").forEach(b=>{
+    b.style.background = "white";
+    b.style.color = color;
+  });
+  if(intensityTag){
+    const el = document.getElementById(`tag-${intensityTag}`);
+    if(el){ el.style.background = color; el.style.color = "white"; }
+  }
+}
+
+function closeIntensity(){
+  document.getElementById("intensity-sheet").classList.add("hidden");
+  intensityType = intensityScore = intensityTag = null;
+}
+
+function confirmIntensity(){
+  if(!intensityScore) return;
+  const type  = intensityType;
+  const score = intensityScore;
+  const tag   = intensityTag;
+  closeIntensity();
+  recordBump(type, score, tag);
+}
+
+// ═══════════════════════════════════════════════════════
+//  RECORD BUMP
+// ═══════════════════════════════════════════════════════
+function recordBump(type, score, tag){
+  const evKey    = type==="rage" ? "rageEvents"  : "thanksEvents";
+  const countKey = type==="rage" ? "rage"         : "thanks";
+  ST[countKey]  += score;
+  ST[evKey].push({ date: new Date().toISOString(), score, tag });
+  saveState(ST);
+  render();
+
+  // flash
+  const fl = document.getElementById("flash-overlay");
+  fl.style.background = type==="rage" ? "#e74c3c" : "#27ae60";
+  fl.style.opacity = "0.11";
+  setTimeout(()=>{ fl.style.opacity="0"; }, 700);
+
+  // milestone check
+  checkMilestones();
+
+  // streak toast (3の倍数で)
+  const streak = calcStreak(ST[evKey]);
+  if(streak>=3 && streak%3===0){
+    const todayKey = new Date().toDateString()+"-"+type+"-"+streak;
+    if(ST.lastStreakNotif !== todayKey){
+      ST.lastStreakNotif = todayKey;
+      saveState(ST);
+      showToast(
+        type==="rage" ? "🔥" : "🌸",
+        `${streak}日間${type==="rage"?ST.rageLabel:ST.thanksLabel}連続達成！`,
+        "記録継続中",
+        type==="rage" ? "#e74c3c" : "#27ae60"
+      );
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  MILESTONE CHECK
+// ═══════════════════════════════════════════════════════
+function checkMilestones(){
+  const shown = new Set(ST.shownMilestones || []);
+  const rStreak = calcStreak(ST.rageEvents);
+  const tStreak = calcStreak(ST.thanksEvents);
+
+  for(const m of MILESTONES){
+    if(shown.has(m.id)) continue;
+    const trigger = m.check(ST, rStreak, tStreak);
+    if(trigger){
+      ST.shownMilestones = [...(ST.shownMilestones||[]), m.id];
+      saveState(ST);
+      setTimeout(()=> triggerMilestone(m), 800);
+      break; // 一度に1つだけ
+    }
+  }
+}
+
+function triggerMilestone(m){
+  document.getElementById("milestone-emoji").textContent = m.emoji;
+  document.getElementById("milestone-title").textContent = m.title;
+  document.getElementById("milestone-desc").textContent  = m.desc;
+  const overlay = document.getElementById("milestone-overlay");
+  overlay.classList.add("show");
+  launchConfetti();
+}
+
+function closeMilestone(){
+  document.getElementById("milestone-overlay").classList.remove("show");
+  stopConfetti();
+}
+
+// ═══════════════════════════════════════════════════════
+//  CONFETTI
+// ═══════════════════════════════════════════════════════
+let confettiAnim = null;
+function launchConfetti(){
+  const canvas = document.getElementById("confetti-canvas");
+  canvas.style.display = "block";
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext("2d");
+  const colors = ["#e74c3c","#27ae60","#f39c12","#3498db","#9b59b6","#e67e22","#1abc9c","#e91e63"];
+  const particles = Array.from({length:80}, ()=>({
+    x: Math.random()*canvas.width,
+    y: -10 - Math.random()*100,
+    w: 6+Math.random()*8,
+    h: 10+Math.random()*6,
+    color: colors[Math.floor(Math.random()*colors.length)],
+    vx: -2+Math.random()*4,
+    vy: 2+Math.random()*4,
+    rot: Math.random()*360,
+    vrot: -3+Math.random()*6,
+    alpha: 1,
+  }));
+  let frame = 0;
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach(p=>{
+      p.x  += p.vx; p.y  += p.vy; p.rot += p.vrot;
+      if(frame>60) p.alpha = Math.max(0, p.alpha-0.008);
+      ctx.save();
+      ctx.translate(p.x,p.y);
+      ctx.rotate(p.rot*Math.PI/180);
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+      ctx.restore();
+    });
+    frame++;
+    if(frame<150) confettiAnim = requestAnimationFrame(draw);
+    else { canvas.style.display="none"; ctx.clearRect(0,0,canvas.width,canvas.height); }
+  }
+  if(confettiAnim) cancelAnimationFrame(confettiAnim);
+  draw();
+}
+
+function stopConfetti(){
+  if(confettiAnim) cancelAnimationFrame(confettiAnim);
+  const canvas = document.getElementById("confetti-canvas");
+  canvas.style.display = "none";
+  canvas.getContext("2d").clearRect(0,0,canvas.width,canvas.height);
+}
+
+// ═══════════════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════════════
+let toastTimer = null;
+function showToast(emoji, msg, sub, color){
+  if(toastTimer){ clearTimeout(toastTimer); }
+  const t  = document.getElementById("toast");
+  const tb = document.getElementById("toast-bar");
+  document.getElementById("toast-emoji").textContent = emoji;
+  document.getElementById("toast-msg").textContent   = msg;
+  document.getElementById("toast-sub").textContent   = sub;
+  t.style.border  = `2px solid ${color}30`;
+  tb.style.background = `linear-gradient(90deg,${color},${color}80)`;
+  tb.style.animation  = "none";
+  t.classList.add("show");
+  setTimeout(()=>{ tb.style.animation = "shrinkBar 3.5s linear forwards"; },50);
+  toastTimer = setTimeout(()=>{ t.classList.remove("show"); },3500);
+}
+
+// ═══════════════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════════════
+function openSettings(){
+  document.getElementById("set-rage-lbl").textContent   = ST.rageLabel   + "の名称";
+  document.getElementById("set-thanks-lbl").textContent = ST.thanksLabel + "の名称";
+  document.getElementById("set-rage-input").value   = ST.rageLabel;
+  document.getElementById("set-thanks-input").value = ST.thanksLabel;
+  document.getElementById("set-title-input").value  = ST.title;
+  document.getElementById("settings-modal").classList.remove("hidden");
+}
+function closeSettings(){ document.getElementById("settings-modal").classList.add("hidden"); }
+function saveSettings(){
+  const r = document.getElementById("set-rage-input").value.trim();
+  const t = document.getElementById("set-thanks-input").value.trim();
+  const ti= document.getElementById("set-title-input").value.trim();
+  if(r)  ST.rageLabel   = r;
+  if(t)  ST.thanksLabel = t;
+  if(ti) ST.title       = ti;
+  saveState(ST);
+  closeSettings();
+  render();
+}
+function showReset(){ document.getElementById("reset-modal").classList.remove("hidden"); }
+function closeReset(){ document.getElementById("reset-modal").classList.add("hidden"); }
+function doReset(){
+  ST = { ...DEFAULT_STATE, startDate: new Date().toISOString(), rageLabel: ST.rageLabel, thanksLabel: ST.thanksLabel, title: ST.title };
+  saveState(ST);
+  closeReset();
+  closeSettings();
+  render();
+}
+
+// ═══════════════════════════════════════════════════════
+//  MONTHLY REPORT
+// ═══════════════════════════════════════════════════════
+function showReport(){
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  const rE = ST.rageEvents.filter(e=>ym(e.date)===thisMonth);
+  const tE = ST.thanksEvents.filter(e=>ym(e.date)===thisMonth);
+  const rScore = rE.reduce((a,e)=>a+(e.score||1),0);
+  const tScore = tE.reduce((a,e)=>a+(e.score||1),0);
+  const tagCount = events => {
+    const c={};
+    events.forEach(e=>{ if(e.tag){ c[e.tag]=(c[e.tag]||0)+(e.score||1); } });
+    return Object.entries(c).sort((a,b)=>b[1]-a[1]);
+  };
+  const rTags = tagCount(rE), tTags = tagCount(tE);
+  const verdict = rScore>tScore ? {t:"😤 激怒優勢の月でした",bg:"#fff0f0"}
+                : rScore<tScore ? {t:"😊 感謝優勢の月でした！",bg:"#f0fff4"}
+                : {t:"⚖️ 五分五分の月でした",bg:"#f8f8f8"};
+
+  document.getElementById("report-title").textContent = `📋 ${now.getMonth()+1}月の総括`;
+
+  let html = `<div style="text-align:center;font-size:14px;font-weight:700;margin-bottom:18px;padding:14px;background:${verdict.bg};border-radius:12px;">${verdict.t}</div>`;
+  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;">
+    <div style="background:#e74c3c12;border-radius:14px;padding:16px;text-align:center;border:1.5px solid #e74c3c25;">
+      <div style="font-size:30px;font-weight:700;color:#e74c3c;line-height:1;">${rScore}</div>
+      <div style="font-size:11px;color:#e74c3c;font-weight:700;margin-top:4px;">${ST.rageLabel}スコア</div>
+      <div style="font-size:10px;color:#bbb;margin-top:2px;">${rE.length}件</div>
+    </div>
+    <div style="background:#27ae6012;border-radius:14px;padding:16px;text-align:center;border:1.5px solid #27ae6025;">
+      <div style="font-size:30px;font-weight:700;color:#27ae60;line-height:1;">${tScore}</div>
+      <div style="font-size:11px;color:#27ae60;font-weight:700;margin-top:4px;">${ST.thanksLabel}スコア</div>
+      <div style="font-size:10px;color:#bbb;margin-top:2px;">${tE.length}件</div>
+    </div>
+  </div>`;
+  if(rTags.length>0){
+    html+=`<div style="font-size:11px;font-weight:700;color:#e74c3c;letter-spacing:0.1em;margin-bottom:8px;">😤 ${ST.rageLabel}カテゴリTOP</div>`;
+    rTags.slice(0,3).forEach(([t,c])=>{
+      html+=`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f5f5f5;"><span style="font-size:12px;color:#555;">${t}</span><span style="font-size:12px;font-weight:700;color:#e74c3c;">${c}pt</span></div>`;
+    });
+    html+='<div style="margin-bottom:14px;"></div>';
+  }
+  if(tTags.length>0){
+    html+=`<div style="font-size:11px;font-weight:700;color:#27ae60;letter-spacing:0.1em;margin-bottom:8px;">😊 ${ST.thanksLabel}カテゴリTOP</div>`;
+    tTags.slice(0,3).forEach(([t,c])=>{
+      html+=`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f5f5f5;"><span style="font-size:12px;color:#555;">${t}</span><span style="font-size:12px;font-weight:700;color:#27ae60;">${c}pt</span></div>`;
+    });
+  }
+  const recentMemos = [...ST.rageMemos,...ST.thanksMemos].slice(0,3);
+  if(recentMemos.length>0){
+    html+=`<div style="margin-top:14px;font-size:11px;font-weight:700;color:#aaa;letter-spacing:0.1em;margin-bottom:8px;">📝 最近のメモ</div>`;
+    recentMemos.forEach(m=>{
+      html+=`<div style="font-size:12px;color:#666;padding:6px 0;border-bottom:1px solid #f5f5f5;line-height:1.7;">${escHtml(m.text)}</div>`;
+    });
+  }
+  document.getElementById("report-body").innerHTML = html;
+  document.getElementById("report-modal").classList.remove("hidden");
+}
+function closeReport(){ document.getElementById("report-modal").classList.add("hidden"); }
+
+// ═══════════════════════════════════════════════════════
+//  STATS PAGE
+// ═══════════════════════════════════════════════════════
+function renderStats(){
+  renderBarChart();
+  renderCategoryChart();
+}
+
+function renderBarChart(){
+  const months={};
+  [...ST.rageEvents.map(e=>({...e,type:"rage"})),...ST.thanksEvents.map(e=>({...e,type:"thanks"}))].forEach(e=>{
+    const k=ym(e.date);
+    if(!months[k]) months[k]={rage:0,thanks:0};
+    months[k][e.type]+=(e.score||1);
+  });
+  const keys=Object.keys(months).sort().slice(-6);
+  const el=document.getElementById("bar-chart");
+  if(keys.length===0){ el.innerHTML=`<div style="text-align:center;color:#ccc;font-size:12px;padding:40px 0;">データがまだありません</div>`; return; }
+  const maxVal=Math.max(...keys.flatMap(k=>[months[k].rage,months[k].thanks]),1);
+  const BAR_H=110;
+  let html=`<div style="display:flex;align-items:flex-end;gap:8px;height:${BAR_H+30}px;">`;
+  keys.forEach(k=>{
+    const rH=Math.round((months[k].rage/maxVal)*BAR_H);
+    const tH=Math.round((months[k].thanks/maxVal)*BAR_H);
+    html+=`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;">
+      <div style="display:flex;align-items:flex-end;gap:3px;height:${BAR_H}px;width:100%;">
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;">
+          <div style="background:linear-gradient(180deg,#ff6b6b,#e74c3c);border-radius:4px 4px 0 0;height:${Math.max(rH,months[k].rage>0?4:0)}px;"></div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;">
+          <div style="background:linear-gradient(180deg,#5dd878,#27ae60);border-radius:4px 4px 0 0;height:${Math.max(tH,months[k].thanks>0?4:0)}px;"></div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#aaa;text-align:center;">${ymLabel(k)}</div>
+    </div>`;
+  });
+  html+=`</div><div style="display:flex;gap:14px;justify-content:center;margin-top:12px;">
+    <div style="display:flex;align-items:center;gap:5px;"><div style="width:10px;height:10px;border-radius:2px;background:linear-gradient(135deg,#ff6b6b,#e74c3c);"></div><span style="font-size:10px;color:#888;">${ST.rageLabel}</span></div>
+    <div style="display:flex;align-items:center;gap:5px;"><div style="width:10px;height:10px;border-radius:2px;background:linear-gradient(135deg,#5dd878,#27ae60);"></div><span style="font-size:10px;color:#888;">${ST.thanksLabel}</span></div>
+  </div>`;
+  el.innerHTML=html;
+}
+
+function renderCategoryChart(){
+  const el=document.getElementById("category-chart");
+  const types=[{events:ST.rageEvents,color:"#e74c3c",label:ST.rageLabel},{events:ST.thanksEvents,color:"#27ae60",label:ST.thanksLabel}];
+  let html="", hasData=false;
+  types.forEach(({events,color,label})=>{
+    const tags={};
+    events.forEach(e=>{ if(e.tag){ tags[e.tag]=(tags[e.tag]||0)+(e.score||1); } });
+    const sorted=Object.entries(tags).sort((a,b)=>b[1]-a[1]);
+    if(sorted.length===0) return;
+    hasData=true;
+    const maxV=Math.max(...sorted.map(x=>x[1]),1);
+    html+=`<div style="margin-bottom:18px;"><div style="font-size:12px;font-weight:700;color:${color};margin-bottom:10px;">${label}</div>`;
+    sorted.forEach(([t,v])=>{
+      html+=`<div style="margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span style="font-size:12px;color:#666;">${t}</span>
+          <span style="font-size:12px;font-weight:700;color:${color};">${v}pt</span>
+        </div>
+        <div style="height:7px;background:#f0f0f0;border-radius:4px;overflow:hidden;">
+          <div style="height:100%;width:${(v/maxV)*100}%;background:${color};border-radius:4px;"></div>
+        </div>
+      </div>`;
+    });
+    html+="</div>";
+  });
+  el.innerHTML = hasData ? html : `<div style="text-align:center;color:#ccc;font-size:12px;padding:20px 0;">カテゴリ付きデータがありません</div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════════
+function escHtml(s){
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// ═══════════════════════════════════════════════════════
+//  SERVICE WORKER REGISTRATION (PWA)
+// ═══════════════════════════════════════════════════════
+if("serviceWorker" in navigator){
+  const swCode = `
+    const CACHE = "husband-tracker-v1";
+    const ASSETS = [self.location.href];
+    self.addEventListener("install", e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+      self.skipWaiting();
+    });
+    self.addEventListener("activate", e => {
+      e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+      self.clients.claim();
+    });
+    self.addEventListener("fetch", e => {
+      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+    });
+  `;
+  const swBlob = new Blob([swCode], {type:"application/javascript"});
+  const swUrl  = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swUrl).catch(()=>{});
+}
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+render();
+// 起動時マイルストーンチェック（記念日ベース）
+setTimeout(checkMilestones, 600);
+</script>
+</body>
+</html>
